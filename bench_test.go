@@ -36,7 +36,9 @@ func initTestdata() {
 func BenchmarkBSBF(b *testing.B) {
 	onceInit.Do(initTestdata)
 
-	bs := NewBSBF("./testdata/data.txt")
+	bs := NewBSBF("./testdata/data.txt",
+		WithSearchCache(true),
+	)
 
 	b.StartTimer()
 	defer b.StopTimer()
@@ -46,8 +48,8 @@ func BenchmarkBSBF(b *testing.B) {
 		if err != nil {
 			b.Error(err)
 		}
-		slices.Reverse(k)
 		if ok {
+			slices.Reverse(k)
 			if !bytes.Equal(val, k) {
 				b.Errorf("%q != %q", val, k)
 			}
@@ -58,11 +60,12 @@ func BenchmarkBSBF(b *testing.B) {
 func BenchmarkParallelBSBF(b *testing.B) {
 	onceInit.Do(initTestdata)
 
-	bs := NewBSBF("./testdata/data.txt")
+	bs := NewBSBF("./testdata/data.txt",
+		WithSearchCache(true),
+	)
 
 	b.StartTimer()
 	defer b.StopTimer()
-
 	b.RunParallel(func(pb *testing.PB) {
 		for i := 0; pb.Next(); i++ {
 			k := []byte(strconv.Itoa(i))
@@ -70,8 +73,8 @@ func BenchmarkParallelBSBF(b *testing.B) {
 			if err != nil {
 				b.Error(err)
 			}
-			slices.Reverse(k)
 			if ok {
+				slices.Reverse(k)
 				if !bytes.Equal(val, k) {
 					b.Errorf("%q != %q", val, k)
 				}

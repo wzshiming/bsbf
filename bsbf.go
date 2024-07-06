@@ -25,13 +25,13 @@ type BSBF struct {
 
 	bufSize int64
 
-	cache map[int64]searchCacheItem
+	cache map[int64]*searchCacheItem
 
 	file *os.File
 	data mmap
 	size int64
 
-	mut sync.RWMutex
+	mut sync.Mutex
 }
 
 type Option func(*BSBF)
@@ -60,6 +60,16 @@ func WithCmpFunc(c CmpFunc) Option {
 	}
 }
 
+func WithSearchCache(b bool) Option {
+	return func(o *BSBF) {
+		if b {
+			o.cache = make(map[int64]*searchCacheItem)
+		} else {
+			o.cache = nil
+		}
+	}
+}
+
 func NewBSBF(path string, opts ...Option) *BSBF {
 	b := &BSBF{
 		cmpFunc:    Compare,
@@ -67,7 +77,6 @@ func NewBSBF(path string, opts ...Option) *BSBF {
 		lineSep:    []byte("\n"),
 		keySepFunc: KeySeparator([]byte(" ")),
 		bufSize:    2 * 1024,
-		cache:      map[int64]searchCacheItem{},
 	}
 	for _, opt := range opts {
 		opt(b)
@@ -113,13 +122,6 @@ func (b *BSBF) resetFile() {
 	return
 }
 func (b *BSBF) loadFile() error {
-	b.mut.RLock()
-	if b.data != nil {
-		b.mut.RUnlock()
-		return nil
-	}
-	b.mut.RUnlock()
-
 	b.mut.Lock()
 	defer b.mut.Unlock()
 	if b.data != nil {
