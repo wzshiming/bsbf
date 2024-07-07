@@ -89,6 +89,9 @@ func NewBSBF(path string, opts ...Option) *BSBF {
 }
 
 func (b *BSBF) Sort(sizeFile int) error {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+
 	err := b.loadFile()
 	if err != nil {
 		return err
@@ -107,8 +110,6 @@ func (b *BSBF) Sort(sizeFile int) error {
 		return err
 	}
 
-	b.mut.Lock()
-	defer b.mut.Unlock()
 	b.resetFile()
 
 	err = os.Rename(newFile, b.path)
@@ -124,9 +125,18 @@ func (b *BSBF) resetFile() {
 	b.data = nil
 	return
 }
-func (b *BSBF) loadFile() error {
+
+func (b *BSBF) Reload() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
+
+	if b.data != nil {
+		b.resetFile()
+	}
+	return b.loadFile()
+}
+
+func (b *BSBF) loadFile() error {
 	if b.data != nil {
 		return nil
 	}
@@ -154,11 +164,12 @@ func (b *BSBF) loadFile() error {
 }
 
 func (b *BSBF) Search(key []byte) (Range, []byte, []byte, bool, error) {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+
 	err := b.loadFile()
 	if err != nil {
 		return Range{}, nil, nil, false, err
 	}
-	b.mut.Lock()
-	defer b.mut.Unlock()
 	return b.search(key)
 }
