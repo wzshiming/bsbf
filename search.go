@@ -16,7 +16,8 @@ type slicer interface {
 
 func (b *BSBF) search(key []byte) (Range, []byte, []byte, bool, error) {
 	i, j := int64(0), b.size
-	for i < j {
+
+	for cacheLevel := 0; i < j; cacheLevel++ {
 		off := int64(uint(i+j) >> 1)
 
 		var c *searchCacheItem
@@ -41,7 +42,7 @@ func (b *BSBF) search(key []byte) (Range, []byte, []byte, bool, error) {
 				Value: v,
 			}
 
-			if b.cache != nil {
+			if b.cache != nil && (b.cacheLevel < 0 || cacheLevel < b.cacheLevel) {
 				b.cache[off] = c
 			}
 		}

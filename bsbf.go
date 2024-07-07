@@ -25,7 +25,8 @@ type BSBF struct {
 
 	bufSize int64
 
-	cache map[int64]*searchCacheItem
+	cache      map[int64]*searchCacheItem
+	cacheLevel int
 
 	file *os.File
 	data mmap
@@ -60,12 +61,14 @@ func WithCmpFunc(c CmpFunc) Option {
 	}
 }
 
-func WithSearchCache(b bool) Option {
+func WithCacheLevel(b int) Option {
 	return func(o *BSBF) {
-		if b {
+		if b != 0 {
 			o.cache = make(map[int64]*searchCacheItem)
+			o.cacheLevel = b
 		} else {
 			o.cache = nil
+			o.cacheLevel = b
 		}
 	}
 }

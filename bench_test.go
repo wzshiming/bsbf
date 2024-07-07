@@ -37,7 +37,7 @@ func BenchmarkBSBF(b *testing.B) {
 	onceInit.Do(initTestdata)
 
 	bs := NewBSBF("./testdata/data.txt",
-		WithSearchCache(true),
+		WithCacheLevel(-1),
 	)
 
 	b.StartTimer()
@@ -61,7 +61,7 @@ func BenchmarkParallelBSBF(b *testing.B) {
 	onceInit.Do(initTestdata)
 
 	bs := NewBSBF("./testdata/data.txt",
-		WithSearchCache(true),
+		WithCacheLevel(-1),
 	)
 
 	b.StartTimer()
