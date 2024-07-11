@@ -158,10 +158,8 @@ func (s *sorter) sliceSort(sizeFile int) error {
 			End:   int64(off),
 		}
 
-		k, _, ok := s.keySep(line)
-		if !ok {
-			continue
-		}
+		k, _ := s.keySep(line)
+
 		s.insert(r, k)
 
 		if len(s.tmpCacheKeyIndex) >= sizeFile {

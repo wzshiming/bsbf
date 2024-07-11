@@ -33,7 +33,8 @@ func main() {
 		return
 	}
 
-	bs := bsbf.NewBSBF(args[1],
+	bs := bsbf.NewBSBF(
+		bsbf.WithPath(args[1]),
 		bsbf.WithLineSep([]byte(l)),
 		bsbf.WithKeySepFunc(bsbf.KeySeparator([]byte(k))),
 	)
@@ -59,7 +60,7 @@ func main() {
 			return
 		}
 
-		_, _, value, ok, err := bs.Search([]byte(args[2]))
+		iter, ok, err := bs.Search([]byte(args[2]))
 		if err != nil {
 			log.Println(err)
 			os.Exit(1)
@@ -67,7 +68,7 @@ func main() {
 		if !ok {
 			fmt.Println("not found")
 		} else {
-			os.Stdout.Write(value)
+			os.Stdout.Write(iter.Value())
 		}
 	}
 }

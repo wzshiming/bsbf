@@ -19,7 +19,6 @@ ef`)
 		args     args
 		want     Range
 		wantData []byte
-		wantErr  bool
 	}{
 		{
 			args: args{
@@ -677,11 +676,8 @@ ef`)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotData, err := seekLine(mmap(tt.args.s), int64(len(tt.args.s)), tt.args.bufSize, lineSep, tt.args.off)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("seekLine() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			begin, end, gotData := seekLine(tt.args.s, tt.args.bufSize, lineSep, tt.args.off)
+			got := Range{Begin: begin, End: end}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("seekLine() got = %v, want %v", got, tt.want)
 			}

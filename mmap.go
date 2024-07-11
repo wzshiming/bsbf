@@ -14,8 +14,3 @@ func newMmap(f *os.File, offset int64, length int) (mmap, error) {
 func (m *mmap) Close() error {
 	return syscall.Munmap(*m)
 }
-
-func (m mmap) Slice(i, j int) ([]byte, error) {
-	l := len(m)
-	return m[i:min(l, j)], nil
-}

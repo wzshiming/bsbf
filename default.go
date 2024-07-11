@@ -14,12 +14,12 @@ func Compare(a, b []byte) int {
 	return bytes.Compare(a, b)
 }
 
-func KeySeparator(sep []byte) func(a []byte) ([]byte, []byte, bool) {
-	return func(a []byte) ([]byte, []byte, bool) {
+func KeySeparator(sep []byte) func(a []byte) ([]byte, []byte) {
+	return func(a []byte) ([]byte, []byte) {
 		index := bytes.Index(a, sep)
 		if index != -1 {
-			return a[:index], a[index+len(sep):], true
+			return a[:index], a[index+len(sep):]
 		}
-		return a, nil, false
+		return a, nil
 	}
 }

@@ -10,12 +10,8 @@ type searchCacheItem struct {
 	Value []byte
 }
 
-type slicer interface {
-	Slice(i, j int) ([]byte, error)
-}
-
 func (b *BSBF) search(key []byte) (Range, []byte, []byte, bool, error) {
-	i, j := int64(0), b.size
+	i, j := int64(0), int64(len(b.data))
 
 	for cacheLevel := 0; i < j; cacheLevel++ {
 		off := int64(uint(i+j) >> 1)
@@ -26,16 +22,14 @@ func (b *BSBF) search(key []byte) (Range, []byte, []byte, bool, error) {
 		}
 
 		if c == nil {
-			rg, content, err := seekLine(b.data, b.size, b.bufSize, b.lineSep, off)
-			if err != nil {
-				return Range{}, nil, nil, false, err
-			}
+			begin, end, content := seekLine(b.data, b.bufSize, b.lineSep, off)
 
-			k, v, ok := b.keySepFunc(content)
-			if !ok {
-				continue
-			}
+			k, v := b.keySepFunc(content)
 
+			rg := Range{
+				Begin: begin,
+				End:   end,
+			}
 			c = &searchCacheItem{
 				Range: rg,
 				Key:   k,
@@ -59,58 +53,45 @@ func (b *BSBF) search(key []byte) (Range, []byte, []byte, bool, error) {
 	return Range{}, nil, nil, false, nil
 }
 
-func seekLine(data slicer, size int64, bufSize int64, lineSep []byte, off int64) (Range, []byte, error) {
-	rg := Range{
-		Begin: -1,
-		End:   -1,
-	}
-
-	if off == 0 {
-		rg.Begin = off
-	}
-
-	var endOffset int64 = -1
-
-	for beginOff := off; rg.Begin == -1; {
+func seekLineBefore(data []byte, bufSize int64, lineSep []byte, off int64) int64 {
+	for beginOff := off; beginOff != 0; {
 		prevBeginOff := beginOff
 		beginOff = max(0, beginOff-bufSize)
 		limitBufSize := min(bufSize, off-beginOff)
 
-		buf, err := data.Slice(int(beginOff), int(beginOff+limitBufSize))
-		if err != nil {
-			return Range{}, nil, err
-		}
-		index := bytes.LastIndex(buf[:limitBufSize], lineSep)
+		buf := data[beginOff : beginOff+limitBufSize]
+		index := bytes.LastIndex(buf, lineSep)
 		if index != -1 {
-			rg.Begin = prevBeginOff - (limitBufSize - int64(index)) + int64(len(lineSep))
-		} else if beginOff == 0 {
-			rg.Begin = beginOff
+			return prevBeginOff - (limitBufSize - int64(index)) + int64(len(lineSep))
 		}
 	}
+	return 0
+}
 
-	for endOff := off; rg.End == -1; {
-		buf, err := data.Slice(int(endOff), int(endOff+bufSize))
-		if err != nil {
-			return Range{}, nil, err
+func seekLineAfter(data []byte, bufSize int64, lineSep []byte, off int64) (int64, int64) {
+	size := int64(len(data))
+	for endOff := off; endOff != size; {
+		nextEndOff := min(size, endOff+bufSize)
+		if endOff == nextEndOff {
+			break
 		}
+		buf := data[endOff:nextEndOff]
 		if len(buf) == 0 {
-			rg.End = size
-			endOffset = size
 			break
 		}
 
 		index := bytes.Index(buf, lineSep)
 		if index != -1 {
-			rg.End = endOff + int64(index+len(lineSep))
-			endOffset = rg.End - int64(len(lineSep))
-		} else {
-			endOff = min(size, endOff+bufSize)
+			end := endOff + int64(index+len(lineSep))
+			return end, end - int64(len(lineSep))
 		}
+		endOff = nextEndOff
 	}
+	return size, size
+}
 
-	line, err := data.Slice(int(rg.Begin), int(endOffset))
-	if err != nil {
-		return Range{}, nil, err
-	}
-	return rg, line, nil
+func seekLine(data []byte, bufSize int64, lineSep []byte, off int64) (int64, int64, []byte) {
+	begin := seekLineBefore(data, bufSize, lineSep, off)
+	end, endOffset := seekLineAfter(data, bufSize, lineSep, off)
+	return begin, end, data[begin:endOffset]
 }

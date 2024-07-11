@@ -13,7 +13,7 @@ type Range struct {
 
 type CmpFunc func(a, b []byte) int
 
-type KeySepFunc func(a []byte) ([]byte, []byte, bool)
+type KeySepFunc func(a []byte) ([]byte, []byte)
 
 type TrimFunc func(a []byte) []byte
 
@@ -33,7 +33,6 @@ type BSBF struct {
 
 	file *os.File
 	data mmap
-	size int64
 
 	mut sync.Mutex
 }
@@ -82,10 +81,21 @@ func WithCacheLevel(b int) Option {
 	}
 }
 
-func NewBSBF(path string, opts ...Option) *BSBF {
+func WithPath(path string) Option {
+	return func(o *BSBF) {
+		o.path = path
+	}
+}
+
+func WithData(data []byte) Option {
+	return func(o *BSBF) {
+		o.data = data
+	}
+}
+
+func NewBSBF(opts ...Option) *BSBF {
 	b := &BSBF{
 		cmpFunc:    Compare,
-		path:       path,
 		lineSep:    []byte("\n"),
 		keySepFunc: KeySeparator([]byte(" ")),
 		bufSize:    2 * 1024,
@@ -94,16 +104,22 @@ func NewBSBF(path string, opts ...Option) *BSBF {
 		opt(b)
 	}
 
+	if b.trimFunc != nil {
+		b.data = b.trimFunc(b.data)
+	}
 	return b
 }
 
 func (b *BSBF) Sort(sizeFile int) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
-
 	err := b.loadFile()
 	if err != nil {
 		return err
+	}
+
+	if b.file == nil {
+		return nil
 	}
 
 	dir := path.Join(path.Dir(b.path), ".bsbf-tmp")
@@ -138,6 +154,9 @@ func (b *BSBF) resetFile() {
 func (b *BSBF) Reload() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
+	if b.file == nil {
+		return nil
+	}
 
 	if b.data != nil {
 		b.resetFile()
@@ -161,28 +180,42 @@ func (b *BSBF) loadFile() error {
 	}
 	size := s.Size()
 
-	m, err := newMmap(f, 0, int(size))
+	data, err := newMmap(f, 0, int(size))
 	if err != nil {
 		return err
 	}
 
 	if b.trimFunc != nil {
-		m = b.trimFunc(m)
+		data = b.trimFunc(data)
 	}
 
-	b.size = int64(len(m))
-	b.data = m
+	b.data = data
 	b.file = f
 	return nil
 }
 
-func (b *BSBF) Search(key []byte) (Range, []byte, []byte, bool, error) {
+func (b *BSBF) Search(key []byte) (*Iterator, bool, error) {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
 	err := b.loadFile()
 	if err != nil {
-		return Range{}, nil, nil, false, err
+		return nil, false, err
 	}
-	return b.search(key)
+	r, k, v, ok, err := b.search(key)
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		return nil, false, nil
+	}
+	iter := &Iterator{
+		b: b,
+		r: r,
+		kv: keyAndValue{
+			key:   k,
+			value: v,
+		},
+	}
+	return iter, true, nil
 }
