@@ -15,9 +15,12 @@ type CmpFunc func(a, b []byte) int
 
 type KeySepFunc func(a []byte) ([]byte, []byte, bool)
 
+type TrimFunc func(a []byte) []byte
+
 type BSBF struct {
 	cmpFunc    CmpFunc
 	keySepFunc KeySepFunc
+	trimFunc   TrimFunc
 
 	path string
 
@@ -58,6 +61,12 @@ func WithKeySepFunc(ks KeySepFunc) Option {
 func WithCmpFunc(c CmpFunc) Option {
 	return func(o *BSBF) {
 		o.cmpFunc = c
+	}
+}
+
+func WithTrimFunc(t TrimFunc) Option {
+	return func(o *BSBF) {
+		o.trimFunc = t
 	}
 }
 
@@ -155,6 +164,10 @@ func (b *BSBF) loadFile() error {
 	m, err := newMmap(f, 0, int(size))
 	if err != nil {
 		return err
+	}
+
+	if b.trimFunc != nil {
+		m = b.trimFunc(m)
 	}
 
 	b.size = int64(len(m))
