@@ -4,6 +4,8 @@ import (
 	"os"
 	"path"
 	"sync"
+
+	"github.com/wzshiming/mmap"
 )
 
 type Range struct {
@@ -31,8 +33,9 @@ type BSBF struct {
 	cache      map[int64]*searchCacheItem
 	cacheLevel int
 
+	mmap *mmap.MMap
 	file *os.File
-	data mmap
+	data []byte
 
 	mut sync.Mutex
 }
@@ -118,7 +121,7 @@ func (b *BSBF) Sort(sizeFile int) error {
 		return err
 	}
 
-	if b.file == nil {
+	if b.mmap == nil {
 		return nil
 	}
 
@@ -135,7 +138,7 @@ func (b *BSBF) Sort(sizeFile int) error {
 		return err
 	}
 
-	b.resetFile()
+	_ = b.Close()
 
 	err = os.Rename(newFile, b.path)
 	if err != nil {
@@ -144,24 +147,39 @@ func (b *BSBF) Sort(sizeFile int) error {
 	return nil
 }
 
-func (b *BSBF) resetFile() {
-	_ = b.data.Close()
-	b.file.Close()
-	b.data = nil
-	return
-}
-
 func (b *BSBF) Reload() error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
-	if b.file == nil {
+	if b.mmap == nil {
 		return nil
 	}
 
 	if b.data != nil {
-		b.resetFile()
+		_ = b.Close()
 	}
 	return b.loadFile()
+}
+
+func (b *BSBF) Close() error {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+	if b.mmap == nil {
+		return nil
+	}
+
+	err := b.mmap.Close()
+	if err != nil {
+		return err
+	}
+
+	err = b.file.Close()
+	if err != nil {
+		return err
+	}
+
+	b.mmap = nil
+	b.file = nil
+	return nil
 }
 
 func (b *BSBF) loadFile() error {
@@ -174,23 +192,19 @@ func (b *BSBF) loadFile() error {
 		return err
 	}
 
-	s, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	size := s.Size()
-
-	data, err := newMmap(f, 0, int(size))
+	m, err := mmap.Map(f, mmap.RDONLY)
 	if err != nil {
 		return err
 	}
 
+	data := m.Data()
 	if b.trimFunc != nil {
 		data = b.trimFunc(data)
 	}
 
 	b.data = data
 	b.file = f
+	b.mmap = m
 	return nil
 }
 
